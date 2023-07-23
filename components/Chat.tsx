@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import {useEffect, useRef, useState} from 'react'
 import { Button } from './Button'
 import { type ChatGPTMessage, ChatLine, LoadingChatLine } from './ChatLine'
 import { useCookies } from 'react-cookie'
@@ -49,6 +49,7 @@ export function Chat() {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [cookie, setCookie] = useCookies([COOKIE_NAME])
+  const abortController = useRef<AbortController | null>(null);
 
   useEffect(() => {
     if (!cookie[COOKIE_NAME]) {
@@ -60,6 +61,7 @@ export function Chat() {
 
   // send message to API /api/chat endpoint
   const sendMessage = async (message: string) => {
+    abortController.current = new AbortController();
     setLoading(true)
     const newMessages = [
       ...messages,
@@ -73,6 +75,7 @@ export function Chat() {
       headers: {
         'Content-Type': 'application/json',
       },
+      signal: abortController.current?.signal,
       body: JSON.stringify({
         messages: last10messages,
         user: cookie[COOKIE_NAME],
@@ -113,8 +116,17 @@ export function Chat() {
     }
   }
 
+  function stopStream() {
+    if (abortController.current) {
+      abortController.current.abort();
+      abortController.current = null;
+    }
+  }
+
   return (
     <div className="rounded-2xl border-zinc-100  lg:border lg:p-6">
+      <Button onClick={stopStream} >Stop Stream</Button>
+      <br/>
       {messages.map(({ content, role }, index) => (
         <ChatLine key={index} role={role} content={content} />
       ))}
